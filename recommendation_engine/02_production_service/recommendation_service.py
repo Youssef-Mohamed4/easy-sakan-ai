@@ -28,25 +28,20 @@ def calculate_similarity(target: Property, candidate: Property, max_price: float
     """Calculates a mathematical similarity score between 0.0 and 1.0."""
     score = 0.0
     
-    # Tunable weights for the recommendation engine
     weights = {
         "price": 0.4,
         "university": 0.3,
         "amenities": 0.3
     }
 
-    # 1. Price Similarity (Normalized)
     if max_price > 0 and target.price and candidate.price:
         price_diff = abs(float(target.price) - float(candidate.price)) / max_price
         score += weights["price"] * (1.0 - price_diff)
 
-    # 2. Location / University Match
     if target.nearestUniversity and candidate.nearestUniversity:
         if target.nearestUniversity.lower() == candidate.nearestUniversity.lower():
             score += weights["university"]
 
-    # 3. Amenities Overlap (Jaccard Similarity)
-    # Safely handle JSON array parsing if they are stored as lists
     target_amenities = set(target.amenities) if target.amenities else set()
     candidate_amenities = set(candidate.amenities) if candidate.amenities else set()
     
@@ -61,18 +56,17 @@ def get_content_based_recommendations(
     db: Session, student_id: int, based_on: str, page: int, page_size: int
 ) -> Dict[str, Any]:
     
-    # 1. Find the user's most recent interaction (VIEW, SAVE, BOOKING)
+    # 1. Fetch the trigger (the target property) via the user's latest interaction
     latest_interaction = db.query(UserInteraction).filter(
-        UserInteraction.student_id == student_id,
-        UserInteraction.interaction_type == based_on.upper()
-    ).order_by(desc(UserInteraction.created_at)).first()
+        UserInteraction.studentId == student_id,
+        UserInteraction.interactionType == based_on.upper()
+    ).order_by(desc(UserInteraction.createdAt)).first()
 
     target_property = None
     if latest_interaction:
-        target_property = db.query(Property).filter(Property.id == latest_interaction.property_id).first()
+        target_property = db.query(Property).filter(Property.id == latest_interaction.propertyId).first()
 
     # 2. Fetch available candidates
-    # Only recommend properties that are APPROVED and isAvailable = True
     query = db.query(Property).filter(
         Property.status == "APPROVED",
         Property.isAvailable == True
@@ -86,7 +80,7 @@ def get_content_based_recommendations(
     if not candidates:
         return {"recommendations": [], "page": page, "pageSize": page_size, "totalPages": 0, "totalCount": 0}
 
-    # 3. If no target property (cold start / brand new user), fallback to highest rated/newest
+    # 3. Cold start fallback
     if not target_property:
         candidates.sort(key=lambda x: x.createdAt, reverse=True)
         return _paginate_and_format(candidates, page, page_size, is_fallback=True)
@@ -103,10 +97,9 @@ def get_content_based_recommendations(
             "reason": f"Similar price range and location to your recent {based_on.lower()}s"
         })
 
-    # 5. Sort by highest mathematical match
     scored_candidates.sort(key=lambda x: x["score"], reverse=True)
 
-    # 6. Paginate and map to exactly match Page 103 of the API Design
+    # 5. Paginate results
     total_count = len(scored_candidates)
     total_pages = math.ceil(total_count / page_size)
     start_idx = (page - 1) * page_size
@@ -115,7 +108,6 @@ def get_content_based_recommendations(
     recommendations = []
     for item in paginated_results:
         prop = item["property"]
-        # Extract primary image URL safely
         images = prop.images if hasattr(prop, 'images') and prop.images else []
         primary_img = next((img.url for img in images if getattr(img, 'isPrimary', False)), "/img/placeholder.jpg")
         
