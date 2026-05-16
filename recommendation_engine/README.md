@@ -1,6 +1,8 @@
-# Recommendation System
+# Recommendation Engine
 
 A content-based filtering engine that recommends student apartments based on price, location (nearest university), area, and amenities.
+
+The engine went through two phases: an offline research prototype and a production service integrated into the Easy Sakan FastAPI backend.
 
 ## How It Works
 
@@ -35,7 +37,22 @@ get_recommendations(target_id, top_n)
 
 It measures the **angle** between two feature vectors rather than their magnitude, so a large apartment and a small one can still match perfectly if their relative feature profiles are aligned. This works well for mixed numeric/binary feature spaces.
 
-## Files
+---
+
+## Structure
+
+```
+recommendation_engine/
+├── 01_research_and_prototyping/   # Offline prototype using Scikit-Learn & Pandas
+│   ├── generate_data.py
+│   ├── mock_properties.csv
+│   └── recommender.py
+└── 02_production_service/         # Pure-Python service integrated into FastAPI backend
+    ├── recommendation_service.py
+    └── api_router_extract.py
+```
+
+### Phase 01 — Research & Prototyping
 
 | File | Description |
 |---|---|
@@ -43,31 +60,70 @@ It measures the **angle** between two feature vectors rather than their magnitud
 | `mock_properties.csv` | Mock dataset (100 apartments, 7 columns) |
 | `recommender.py` | Core model — feature engineering, similarity matrix, recommendation function, and metrics |
 
+### Phase 02 — Production Service
+
+After validating the algorithm in the prototype, the logic was translated into a **pure-Python service** with no Scikit-Learn or Pandas dependency. This keeps the FastAPI Docker image lightweight and delivers sub-5ms response times.
+
+| File | Description |
+|---|---|
+| `recommendation_service.py` | Core scoring logic against live SQLAlchemy ORM models. Handles cold-start fallback for new users with no interaction history. |
+| `api_router_extract.py` | FastAPI router that exposes `GET /properties/recommended`. Handles pagination, JWT-based auth via dependency injection, and wraps results in the platform's standard JSON envelope. |
+
+**Key differences from the prototype:**
+
+| | Prototype | Production |
+|---|---|---|
+| **Similarity method** | Cosine similarity matrix (Scikit-Learn) | Weighted scoring function (pure Python) |
+| **Amenities matching** | Multi-label binarization | Jaccard similarity |
+| **Data source** | CSV file | PostgreSQL via SQLAlchemy |
+| **Cold start** | Not handled | Falls back to newest listings |
+| **Auth** | None | JWT via `get_current_user` dependency |
+| **Output** | Console print | Paginated JSON API response |
+
+---
+
 ## Usage
+
+### Prototype
 
 **Step 1 — Generate (or replace) the dataset:**
 ```bash
-python generate_data.py
+python 01_research_and_prototyping/generate_data.py
 ```
 
 **Step 2 — Run the recommender:**
 ```bash
-python recommender.py
+python 01_research_and_prototyping/recommender.py
 ```
 
-This will print:
-- The target property's details
-- Top 5 most similar listings with match scores
-- System metrics (latency, catalog coverage, diversity)
-
-**To query a different property**, change `target_property_id` at the bottom of `recommender.py`:
+To query a different property, change `target_property_id` at the bottom of `recommender.py`:
 ```python
 target_property_id = 42  # any id from 1–100
 ```
 
+### Production API
+
+The endpoint is mounted on the Easy Sakan FastAPI backend. Once the server is running:
+
+```
+GET /properties/recommended?page=1&pageSize=10&basedOn=views
+```
+
+| Query param | Default | Options |
+|---|---|---|
+| `page` | `1` | any positive int |
+| `pageSize` | `10` | 1–20 |
+| `basedOn` | `views` | `views`, `saves`, `bookings` |
+
+Requires a valid JWT in the `Authorization` header. The recommendation target is derived automatically from the authenticated user's most recent interaction of the specified type.
+
+---
+
 ## Tuning the Weights
 
-The weights in `recommender.py` control how much each feature group influences the final score. Edit these lines to reprioritize:
+### Prototype
+
+Edit the multipliers in `recommender.py`:
 
 ```python
 feature_matrix = pd.concat([
@@ -78,15 +134,31 @@ feature_matrix = pd.concat([
 ], axis=1)
 ```
 
+### Production
+
+Edit the `weights` dict in `recommendation_service.py`:
+
+```python
+weights = {
+    "price":      0.4,
+    "university": 0.3,
+    "amenities":  0.3,
+}
+```
+
+---
+
 ## Metrics
 
-The script measures three things automatically at runtime:
+Measured on the prototype against 100 listings:
 
 | Metric | Recorded value | What it means |
 |---|---|---|
 | **Execution Time** | 0.0020s | Well under the 0.01s target for 100 listings — will scale comfortably to larger catalogs |
 | **Catalog Coverage** | 100% (100/100) | Every listing in the dataset appears in at least one recommendation list — no popularity bias |
 | **Intra-List Diversity** | ±1238.92 EGP | Healthy spread; the model is not surfacing near-identical price clones |
+
+---
 
 ## Dataset Schema
 

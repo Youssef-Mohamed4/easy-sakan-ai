@@ -6,10 +6,14 @@ AI features for the Easy-Sakan student housing platform.
 
 ```
 easy-sakan-ai/
-├── recommendation_system/   # Content-based apartment recommender
-│   ├── generate_data.py
-│   ├── mock_properties.csv
-│   ├── recommender.py
+├── recommendation_engine/
+│   ├── 01_research_and_prototyping/
+│   │   ├── generate_data.py
+│   │   ├── mock_properties.csv
+│   │   └── recommender.py
+│   ├── 02_production_service/
+│   │   ├── recommendation_service.py
+│   │   └── api_router_extract.py
 │   └── README.md
 ├── requirements.txt
 └── README.md
@@ -21,7 +25,7 @@ Each subdirectory is a self-contained AI module. New models will be added here a
 
 | Module | Description | Status |
 |---|---|---|
-| [`recommendation_system`](./recommendation_system/README.md) | Content-based filtering — recommends similar apartments using cosine similarity on price, location, area, and amenities | ✅ Ready |
+| [`recommendation_engine`](./recommendation_engine/README.md) | Content-based filtering — recommends similar apartments using cosine similarity on price, location, area, and amenities. Includes research prototype and production FastAPI service. | ✅ Ready |
 
 ## Setup
 
