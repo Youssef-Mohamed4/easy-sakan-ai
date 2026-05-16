@@ -1,5 +1,6 @@
 import pandas as pd
 import json
+import time
 from sklearn.preprocessing import MinMaxScaler, MultiLabelBinarizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -55,9 +56,6 @@ def get_recommendations(target_id, top_n=5):
     results['matchScore'] = scores
     return results
 
-# ==========================================
-# Run the Eyeball Test
-# ==========================================
 target_property_id = 1 
 
 print("================ TARGET PROPERTY ================")
@@ -66,3 +64,31 @@ print("\n")
 
 print("================ TOP 5 RECOMMENDATIONS ================")
 print(get_recommendations(target_property_id).to_string(index=False))
+
+print("\n================ SYSTEM METRICS ================")
+
+# 1. Execution Time (Latency)
+# Measures how fast the model returns results (Crucial for API performance)
+start_time = time.perf_counter()
+_ = get_recommendations(target_id=1, top_n=5)
+end_time = time.perf_counter()
+latency = end_time - start_time
+print(f"1. Execution Time: {latency:.4f} seconds")
+
+# 2. Catalog Coverage
+# Measures what percentage of our total inventory ever gets recommended
+all_recommended_ids = set()
+total_apartments = len(df)
+
+for property_id in df['id']:
+    recs = get_recommendations(target_id=property_id, top_n=5)
+    all_recommended_ids.update(recs['id'].tolist())
+
+coverage_percent = (len(all_recommended_ids) / total_apartments) * 100
+print(f"2. Catalog Coverage: {coverage_percent:.1f}% ({len(all_recommended_ids)}/{total_apartments} unique properties shown)")
+
+# 3. Intra-List Diversity (Price)
+# Measures the standard deviation of prices in the top 5 to ensure we aren't showing identical clones
+sample_recs = get_recommendations(target_id=1, top_n=5)
+price_std = sample_recs['price'].std()
+print(f"3. Intra-List Diversity (Price Std Dev for Target 1): ±{price_std:.2f} EGP")
