@@ -1,4 +1,10 @@
-# ── Recommendation System ──────────────────────────────────────────────────────
-pandas>=2.0.0
-scikit-learn>=1.4.0
+# ── Core & Data Manipulation ───────────────────────────────────────────────────
+pandas==2.3.3
 numpy>=1.26.0
+
+# ── Recommendation System (Content-Based Filtering) ──────────────────────────
+scikit-learn==1.8.0
+
+# ── Pricing Engine (XGBoost Regression) ──────────────────────────────────────
+xgboost==3.1.3  
+joblib==1.5.0
