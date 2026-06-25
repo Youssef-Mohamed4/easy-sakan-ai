@@ -1,0 +1,24 @@
+# Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
+# Heavy AI Models & Cache
+yolov8n.pt
+*.pt
+!ai_verification_engine/02_production_service/stamp_detector.pt
+
+# YOLO Generated Data & Runs
+yolo_dataset/
+runs/
+*.cache
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Block ALL loose prototyping images
+ai_verification_engine/01_research_and_prototyping/*.jpg
+ai_verification_engine/01_research_and_prototyping/mock_dataset/

@@ -1,0 +1,7 @@
+
+path: /home/youssef/Projects/easy-sakan-ai/document_fraud_detector/01_research_and_prototyping/yolo_dataset
+train: images/train
+val: images/train # Using train for val just for this rapid prototype
+
+names:
+  0: official_stamp
