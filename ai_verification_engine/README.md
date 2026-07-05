@@ -3,6 +3,19 @@
 An enterprise-grade, multi-layered Automated Verification Engine built to prevent identity theft and platform fraud on the Easy Sakan platform. This module processes uploaded documents — National IDs, University IDs, and Property Deeds — through a rigorous series of security vectors before routing them to the Admin Dashboard.
 
 ---
+ 
+## 🖥️ UI Integration & Dashboard
+ 
+### Admin Users Dashboard
+![Admin Dashboard](../assets/Screenshot_20260705_174430.png)
+*Every submitted document appears here, not just flagged ones. Clean documents that pass all 6 vectors are shown too, each labeled with its current status: APPROVED, PENDING_REVIEW, or REJECTED. The backend also applies a strict "Fail-Closed" security policy—if any AI component crashes, the document is automatically flagged for review.*
+ 
+### Dynamic Document Routing
+![Student Upload](../assets/Screenshot_20260705_174658.png)
+![Landlord Upload](../assets/Screenshot_20260705_174743.png)
+*The frontend dynamically requests different documents based on the user role. The AI engine applies strict Stamp Detection rules only to Property Deeds, while Face Detection is enforced on IDs.*
+ 
+---
 
 ## 🛡️ System Architecture — The 6 Vectors
 

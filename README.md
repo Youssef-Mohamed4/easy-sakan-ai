@@ -3,6 +3,20 @@
 AI features and machine learning micro-services for the Easy-Sakan student housing platform.
 
 ---
+ 
+## 🖥️ System Integration & UI Preview
+ 
+The AI micro-services are fully integrated into the Easy Sakan Next.js frontend via FastAPI, providing real-time data processing and autonomous decision-making.
+ 
+### 1. Automated Fraud Detection Dashboard
+![Fraud Detection Dashboard](assets/Screenshot_20260705_174140.png)
+*Admin view of AI-flagged documents. The pipeline short-circuits to reject forged documents while sending suspicious ones for manual review with detailed Risk Scores.*
+ 
+### 2. AI-Powered Market Pricing & Deal Ratings
+![Market Pricing](assets/Screenshot_20260705_174002.png)
+*Real-time XGBoost predictions evaluating whether properties are underpriced (Best Deal) or overpriced compared to the mathematical market average.*
+ 
+---
 
 ## Structure
 

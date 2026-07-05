@@ -4,6 +4,23 @@ An XGBoost-based regression engine that predicts fair market rent for student ho
 
 The engine went through two phases: an offline research and training pipeline, and a production-ready `.joblib` artifact integrated into the Easy Sakan FastAPI backend.
 
+---
+ 
+## 🖥️ UI Integration: Deal Rating System
+ 
+The backend compares the landlord's asking price against the XGBoost `Predicted Price` (accounting for the MAE) to generate a heuristic Deal Rating.
+ 
+### The Heuristic Thresholds
+![Excellent Deal](../assets/Screenshot_20260705_173826.png)
+* **Best Deal (Excellent):** Asking price is lower than the AI market prediction.
+
+![Fair Deal](../assets/Screenshot_20260705_173853.png)
+* **Fair Deal:** Asking price is within an acceptable ±15% margin of the AI prediction.
+
+![Overpriced](../assets/Screenshot_20260705_173916.png)
+* **Overpriced:** Asking price heavily exceeds the AI prediction, warning the student.
+---
+
 ## How It Works
 
 The system uses **XGBoost (Extreme Gradient Boosting)** to process non-linear relationships in the Egyptian real estate market, simulating the mental models and premium pricing floors used by actual landlords.

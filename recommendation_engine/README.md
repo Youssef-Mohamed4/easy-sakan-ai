@@ -4,6 +4,16 @@ A content-based filtering engine that recommends student apartments based on pri
 
 The engine went through two phases: an offline research prototype and a production service integrated into the Easy Sakan FastAPI backend.
 
+---
+ 
+## 🖥️ UI Integration
+ 
+### Personalized Student Dashboard
+![Recommended Properties](../assets/Screenshot_20260705_173545.png)
+*The frontend dynamically displays the Top 4 recommended properties based on the user's latest interaction session (views, saves, or bookings). Calculations are performed strictly On-The-Fly to ensure real-time personalization.*
+ 
+---
+
 ## How It Works
 
 The model represents each apartment as a numeric vector and uses **cosine similarity** to find the most similar listings to a given target property.
