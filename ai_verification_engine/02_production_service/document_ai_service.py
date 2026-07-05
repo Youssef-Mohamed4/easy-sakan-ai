@@ -14,7 +14,6 @@ class DocumentVerificationService:
         self.rec_predictor = RecognitionPredictor()
         
         # 2. Load Custom YOLO Stamp Detector
-        # Get absolute path dynamically based on this file's location
         base_dir = os.path.dirname(os.path.abspath(__file__))
         weights_path = os.path.join(base_dir, "ai_weights", "stamp_detector.pt")
         self.stamp_model = YOLO(weights_path)
@@ -91,7 +90,6 @@ class DocumentVerificationService:
                 for k, v in exif.items():
                     if k in ExifTags.TAGS and ExifTags.TAGS[k] == 'Software':
                         software = str(v).lower()
-                        # List of common editing apps
                         suspicious_apps = ['picsart', 'photoshop', 'canva', 'samsung', 'snapseed', 'lightroom']
                         if any(app in software for app in suspicious_apps):
                             print(f"⚠️ Metadata Alert: Edited by {v}")
@@ -101,21 +99,23 @@ class DocumentVerificationService:
             return False
 
     def detect_human_face(self, image_path: str) -> bool:
-        """Uses OpenCV Haar Cascades to verify a real human face exists (catches emojis)."""
+        """Uses OpenCV Haar Cascades to verify a real human face exists."""
         try:
-            # Load OpenCV's built-in lightweight face detector
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
             img = cv2.imread(image_path)
+            if img is None:
+                print("🚨 AI Alert: OpenCV could not read the image.")
+                return False
+            
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # Increased minNeighbors to 6 to strictly prevent false positives on non-human patterns
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6)
             
-            # Detect faces (scaleFactor 1.1, minNeighbors 4 are standard for IDs)
-            faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-            
-            # If it finds at least one face, return True
             return len(faces) > 0
-        except Exception:
-            # If it fails to run, assume True so we don't break the pipeline
-            return True
+        except Exception as e:
+            print(f"🚨 AI Crash in Face Detection: {e}")
+            # MUST fail-closed to prevent fraud bypass
+            return False
 
     def process_document(self, uploaded_file_path: str) -> dict:
         """The Main Pipeline Endpoint"""
@@ -125,23 +125,21 @@ class DocumentVerificationService:
         has_stamp = self.check_official_stamp(clean_path)
         extracted_text = self.extract_arabic_text(clean_path)
         
-        # --- NEW HACKS START HERE ---
         is_software_edited = self.check_exif_metadata(clean_path)
         has_face = self.detect_human_face(clean_path)
-        # --- NEW HACKS END HERE ---
         
         if clean_path != uploaded_file_path and os.path.exists(clean_path):
             os.remove(clean_path)
             
         # Business Logic Rules:
         if is_software_edited:
-            status = "REJECTED_FORGERY_DETECTED" # Caught by Metadata
+            status = "REJECTED_FORGERY_DETECTED"
             print("🚨 REJECTED: Editing software found in metadata!")
         elif not has_face:
-            status = "REJECTED_FORGERY_DETECTED" # Caught sticker
+            status = "REJECTED_FORGERY_DETECTED"
             print("🚨 REJECTED: No real human face detected!")
         elif forgery_score > 0.25:
-            status = "REJECTED_FORGERY_DETECTED" # Caught by ELA math
+            status = "REJECTED_FORGERY_DETECTED"
         elif not has_stamp:
             status = "MANUAL_REVIEW_NO_STAMP"
         else:
@@ -152,7 +150,7 @@ class DocumentVerificationService:
             "metrics": {
                 "forgery_score": round(forgery_score, 4),
                 "has_official_stamp": has_stamp,
-                "text_length": len(extracted_text),
+                "text_length": len(extracted_text) if extracted_text else 0, # Secure length extraction
                 "software_edited": is_software_edited,
                 "face_detected": has_face
             },

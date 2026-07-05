@@ -10,9 +10,6 @@ Pandas in the research phase, the algorithm was translated into this pure-Python
 service. This architectural pivot eliminated heavy ML dependencies from the 
 deployment container, keeping the FastAPI Docker image lightweight and ensuring 
 sub-5ms response times.
-
-Dependencies like `app.models` refer to the SQLAlchemy ORM models in the 
-private core repository.
 =============================================================================
 """
 
@@ -23,25 +20,30 @@ from sqlalchemy import desc
 
 from app.models.property import Property
 from app.models.user_interaction import UserInteraction
+from app.models.user import Student
 
 def calculate_similarity(target: Property, candidate: Property, max_price: float) -> float:
     """Calculates a mathematical similarity score between 0.0 and 1.0."""
     score = 0.0
     
+    # Tunable weights for the recommendation engine
     weights = {
         "price": 0.4,
         "university": 0.3,
         "amenities": 0.3
     }
 
+    # 1. Price Similarity (Normalized)
     if max_price > 0 and target.price and candidate.price:
         price_diff = abs(float(target.price) - float(candidate.price)) / max_price
         score += weights["price"] * (1.0 - price_diff)
 
+    # 2. Location / University Match
     if target.nearestUniversity and candidate.nearestUniversity:
         if target.nearestUniversity.lower() == candidate.nearestUniversity.lower():
             score += weights["university"]
 
+    # 3. Amenities Overlap (Jaccard Similarity)
     target_amenities = set(target.amenities) if target.amenities else set()
     candidate_amenities = set(candidate.amenities) if candidate.amenities else set()
     
@@ -56,17 +58,15 @@ def get_content_based_recommendations(
     db: Session, student_id: int, based_on: str, page: int, page_size: int
 ) -> Dict[str, Any]:
     
-    # 1. Fetch the trigger (the target property) via the user's latest interaction
     latest_interaction = db.query(UserInteraction).filter(
-        UserInteraction.studentId == student_id,
-        UserInteraction.interactionType == based_on.upper()
-    ).order_by(desc(UserInteraction.createdAt)).first()
+        UserInteraction.studentId == student_id,           
+        UserInteraction.interactionType == based_on.upper() 
+    ).order_by(desc(UserInteraction.createdAt)).first()    
 
     target_property = None
     if latest_interaction:
         target_property = db.query(Property).filter(Property.id == latest_interaction.propertyId).first()
 
-    # 2. Fetch available candidates
     query = db.query(Property).filter(
         Property.status == "APPROVED",
         Property.isAvailable == True
@@ -80,12 +80,23 @@ def get_content_based_recommendations(
     if not candidates:
         return {"recommendations": [], "page": page, "pageSize": page_size, "totalPages": 0, "totalCount": 0}
 
-    # 3. Cold start fallback
     if not target_property:
-        candidates.sort(key=lambda x: x.createdAt, reverse=True)
-        return _paginate_and_format(candidates, page, page_size, is_fallback=True)
+        used_fallback = True
+        student = db.query(Student).filter(Student.id == student_id).first()
 
-    # 4. Score all candidates using pure-Python vector math
+        if student and student.university and student.university.strip() != "":
+            student_uni = student.university.strip().lower()
+            university_candidates = [
+                c for c in candidates 
+                if c.nearestUniversity and (student_uni in c.nearestUniversity.strip().lower() or c.nearestUniversity.strip().lower() in student_uni)
+            ]
+            if university_candidates:
+                candidates = university_candidates
+                used_fallback = False
+
+        candidates.sort(key=lambda x: x.createdAt, reverse=True)
+        return _paginate_and_format(candidates, page, page_size, is_fallback=used_fallback)
+
     max_price = max([float(p.price) for p in candidates if p.price] + [float(target_property.price or 0)])
     
     scored_candidates = []
@@ -99,7 +110,6 @@ def get_content_based_recommendations(
 
     scored_candidates.sort(key=lambda x: x["score"], reverse=True)
 
-    # 5. Paginate results
     total_count = len(scored_candidates)
     total_pages = math.ceil(total_count / page_size)
     start_idx = (page - 1) * page_size
@@ -118,11 +128,17 @@ def get_content_based_recommendations(
             "location": {"address": prop.address},
             "images": [{"url": primary_img, "isPrimary": True}],
             "matchReason": item["reason"],
-            "matchScore": item["score"]
+            "matchScore": item["score"],
+            "landlord": {"fullName": prop.landlord.fullName if prop.landlord else "Unknown"},
+            "availability": {"availableSlots": (prop.totalCapacity or 0) - (prop.occupiedSlots or 0)},
+            "rating": 0,
+            "reviewCount": 0,
+            "mlInsights": prop.mlInsights if hasattr(prop, "mlInsights") else None
         })
 
     return {
         "recommendations": recommendations,
+        "items": recommendations,
         "page": page,
         "pageSize": page_size,
         "totalPages": total_pages,
@@ -130,7 +146,6 @@ def get_content_based_recommendations(
     }
 
 def _paginate_and_format(properties: List[Property], page: int, page_size: int, is_fallback: bool) -> Dict[str, Any]:
-    """Helper for formatting cold-start fallback properties."""
     total_count = len(properties)
     total_pages = math.ceil(total_count / page_size)
     start_idx = (page - 1) * page_size
@@ -147,11 +162,17 @@ def _paginate_and_format(properties: List[Property], page: int, page_size: int, 
             "location": {"address": prop.address},
             "images": [{"url": primary_img, "isPrimary": True}],
             "matchReason": "Popular on Easy Sakan right now" if is_fallback else "",
-            "matchScore": 0.75
+            "matchScore": 0.75,
+            "landlord": {"fullName": prop.landlord.fullName if prop.landlord else "Unknown"},
+            "availability": {"availableSlots": (prop.totalCapacity or 0) - (prop.occupiedSlots or 0)},
+            "rating": 0,
+            "reviewCount": 0,
+            "mlInsights": prop.mlInsights if hasattr(prop, "mlInsights") else None
         })
 
     return {
         "recommendations": recommendations,
+        "items": recommendations,
         "page": page,
         "pageSize": page_size,
         "totalPages": total_pages,
